@@ -10,6 +10,7 @@ import requestLogger from './src/middlewares/request-logger.js';
 import { globalLimiter } from './src/middlewares/security.js';
 import { trackIniActivity } from './src/middlewares/ini-activity.js';
 import HttpClientService from "./src/services/http-client-service.js";
+import { androidReleaseConfig } from './src/config/app-release-config.js';
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -54,6 +55,13 @@ app.use('/ini/legal', express.static('public/ini/legal'));
 app.get('/privacy-policy', (req, res) => res.redirect(302, '/ini/legal/privacy-policy.html'));
 app.get('/delete-account', (req, res) => res.redirect(302, '/ini/legal/delete-account.html'));
 app.get('/child-safety-standards', (req, res) => res.redirect(302, '/ini/legal/child-safety-standards.html'));
+
+// 公開版本政策：App 啟動時使用，不依賴登入權杖。
+// 在 Render 調高 INI_ANDROID_MIN_VERSION_CODE 即可強制舊版更新。
+app.get('/api/app-config/android', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, data: androidReleaseConfig() });
+});
 
 
 

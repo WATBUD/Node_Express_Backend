@@ -178,6 +178,7 @@ export default (handler) => {
    *         description: JWT 缺失、無效或已過期
    */
   router.get("/api/auth/me", handler.me);
+  router.get("/api/text/discovery", handler.textDiscovery);
   router.get("/api/profiles/:id", handler.publicProfile);
   /**
    * @swagger
@@ -301,5 +302,6 @@ export default (handler) => {
     validateRequestBody(accountDeleteDto, { abortEarly: false }),
     handler.deleteAccount,
   );
+  router.delete("/api/auth/test-data", handler.resetTestData);
   return router;
 };

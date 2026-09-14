@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client'
 import { iniDatabaseUrl } from '../database/database-urls.js'
-import { showIniTestData } from '../config/runtime-config.js'
 
 const db = new PrismaClient({ datasources: { db: { url: iniDatabaseUrl } } })
 const numberId = value => Number(value)
@@ -18,7 +17,7 @@ export default {
       JOIN users u ON u.user_id = CASE WHEN c.user_low_id = ${numberId(userId)} THEN c.user_high_id ELSE c.user_low_id END
       JOIN user_profiles p ON p.user_id = u.user_id
       WHERE (c.user_low_id = ${numberId(userId)} OR c.user_high_id = ${numberId(userId)}) AND u.is_banned = FALSE
-        AND (${showIniTestData} OR u.is_test_account = FALSE)
+        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ${numberId(userId)} AND viewer.is_test_account = TRUE))
       ORDER BY COALESCE(last_message_at, c.created_at) DESC`
   },
 

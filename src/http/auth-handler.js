@@ -101,4 +101,24 @@ export default (service) => ({
       sendError(req, res, e);
     }
   },
+  textDiscovery: async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        data: await service.textDiscovery(req.user.user_id),
+      });
+    } catch (e) {
+      sendError(req, res, e);
+    }
+  },
+  resetTestData: async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        data: await service.resetTestData(req.user.user_id),
+      });
+    } catch (e) {
+      sendError(req, res, e);
+    }
+  },
 });

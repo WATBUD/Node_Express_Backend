@@ -1,14 +1,13 @@
 import { PrismaClient } from '@prisma/client'
 import { iniDatabaseUrl } from '../database/database-urls.js'
-import { showIniTestData } from '../config/runtime-config.js'
 
 const db = new PrismaClient({ datasources: { db: { url: iniDatabaseUrl } } })
 
 const numberId = value => Number(value)
 
 export default {
-  async findUser(userId) {
-    const rows = await db.$queryRaw`SELECT user_id FROM users WHERE user_id = ${numberId(userId)} AND is_banned = FALSE AND (${showIniTestData} OR is_test_account = FALSE) LIMIT 1`
+  async findUser(userId, viewerUserId = userId) {
+    const rows = await db.$queryRaw`SELECT user_id FROM users WHERE user_id = ${numberId(userId)} AND is_banned = FALSE AND (is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)} AND viewer.is_test_account = TRUE)) LIMIT 1`
     return rows[0] ?? null
   },
 
@@ -35,7 +34,7 @@ export default {
       JOIN voice_profile_assets vp ON vp.user_id = u.user_id
       JOIN user_profiles viewer ON viewer.user_id = ${numberId(userId)}
       WHERE u.user_id <> ${numberId(userId)} AND u.is_banned = FALSE
-        AND (${showIniTestData} OR u.is_test_account = FALSE)
+        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer_user WHERE viewer_user.user_id = ${numberId(userId)} AND viewer_user.is_test_account = TRUE))
         AND NOT EXISTS (
           SELECT 1 FROM voice_invites v
           WHERE v.sender_user_id = ${numberId(userId)}
@@ -61,13 +60,13 @@ export default {
     return { userId: numberId(userId), durationMs }
   },
 
-  async getProfileVoice(userId) {
+  async getProfileVoice(userId, viewerUserId) {
     const rows = await db.$queryRaw`
       SELECT vp.user_id, vp.mime_type, vp.byte_size, vp.duration_ms, vp.audio_data
       FROM voice_profile_assets vp
       JOIN users u ON u.user_id = vp.user_id
       WHERE vp.user_id = ${numberId(userId)} AND u.is_banned = FALSE
-        AND (${showIniTestData} OR u.is_test_account = FALSE)
+        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)} AND viewer.is_test_account = TRUE))
       LIMIT 1`
     return rows[0] ?? null
   },
@@ -111,9 +110,9 @@ export default {
       JOIN user_profiles p ON p.user_id = u.user_id
       JOIN voice_recording_assets a ON a.voice_invite_id = v.id
       WHERE ${ownerColumn} = ? AND v.status <> 'cancelled'
-        AND ${showIniTestData ? 'TRUE' : 'u.is_test_account = FALSE'}
+        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ? AND viewer.is_test_account = TRUE))
       ORDER BY v.created_at DESC
-      LIMIT 100`, numberId(userId))
+      LIMIT 100`, numberId(userId), numberId(userId))
   },
 
   async getAccessible(inviteId, userId) {

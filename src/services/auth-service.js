@@ -4,7 +4,6 @@ import {
   consumeVerification,
   requestVerification,
 } from "./verification-service.js";
-import { showIniTestData } from "../config/runtime-config.js";
 
 const GENDER_CHANGE_DAYS = 30;
 const listOrEmpty = (value) => (Array.isArray(value) ? value : []);
@@ -32,6 +31,7 @@ const publicUser = (user) => ({
   relationship: user.relationship ?? "",
   looking_for: user.looking_for ?? "",
   profile_initialized: Boolean(user.profile_initialized),
+  is_test_account: Boolean(user.is_test_account),
   createdAt: user.created_at,
 });
 const authError = (message, statusCode, code) =>
@@ -258,9 +258,6 @@ export default class AuthService {
     if (!user || !(await verifyPassword(password, user.password_hash))) {
       throw authError("帳號或密碼不正確", 401, "INVALID_CREDENTIALS");
     }
-    if (!showIniTestData && user.is_test_account) {
-      throw authError("Test accounts are disabled.", 403, "TEST_ACCOUNT_DISABLED");
-    }
     if (user.is_banned) throw authError("帳號已停用", 403, "ACCOUNT_DISABLED");
     return this.session(user);
   }
@@ -272,12 +269,15 @@ export default class AuthService {
     return publicUser({ ...user, ...customOptions });
   }
 
-  async publicProfile(_viewerUserId, targetUserId) {
+  async publicProfile(viewerUserId, targetUserId) {
     const targetId = Number(targetUserId);
     if (!Number.isInteger(targetId) || targetId <= 0)
       throw authError("Invalid user id.", 400, "INVALID_USER_ID");
-    const user = await this.users.getUserById(targetId);
-    if (!user || user.is_banned || (!showIniTestData && user.is_test_account))
+    const [viewer, user] = await Promise.all([
+      this.users.getUserById(viewerUserId),
+      this.users.getUserById(targetId),
+    ]);
+    if (!user || user.is_banned || (user.is_test_account && !viewer?.is_test_account))
       throw authError("User not found.", 404, "USER_NOT_FOUND");
     const options = await this.users.getCustomOptions(targetId);
     const profile = publicUser({ ...user, ...options });
@@ -361,6 +361,20 @@ export default class AuthService {
     if (!user) throw authError("User not found.", 404, "USER_NOT_FOUND");
     const customTags = validateCustomOptions(custom_tags);
     const customInterests = validateCustomOptions(custom_interests);
+    if (interests.length + customInterests.length === 0) {
+      throw authError(
+        "At least one interest is required.",
+        400,
+        "PROFILE_FIELD_REQUIRED",
+      );
+    }
+    if (!input.zodiac || !input.relationship || !input.looking_for) {
+      throw authError(
+        "Zodiac, relationship status, and looking-for are required.",
+        400,
+        "PROFILE_FIELD_REQUIRED",
+      );
+    }
     const presetTags = validatePresetOptions(
       tags,
       TAG_IDS,
@@ -411,6 +425,43 @@ export default class AuthService {
     if (!(await this.users.deleteUser(userId)))
       throw authError("User not found.", 404, "USER_NOT_FOUND");
     return { deleted: true };
+  }
+
+  async textDiscovery(viewerUserId) {
+    const viewer = await this.users.getUserById(viewerUserId);
+    if (!viewer) throw authError("User not found.", 404, "USER_NOT_FOUND");
+    const rows = await this.users.discoverTextProfiles(viewerUserId);
+    return rows.map((row) => ({
+      id: Number(row.user_id),
+      name: row.display_name,
+      birthdate: row.birthdate
+        ? row.birthdate.toISOString().slice(0, 10)
+        : null,
+      gender: row.gender,
+      image:
+        row.avatar_id ||
+        (row.gender === "female" ? "moon-cat" : "star-dragon"),
+      location: row.city || row.location || "",
+      distanceKm:
+        row.distance_km === null ? null : Number(row.distance_km),
+      lastActiveAt: row.last_active_at,
+      updatedAt: row.updated_at,
+      headline: row.headline || "",
+      bio: row.bio,
+    }));
+  }
+
+  async resetTestData(userId) {
+    const user = await this.users.getUserById(userId);
+    if (!user) throw authError("User not found.", 404, "USER_NOT_FOUND");
+    if (!user.is_test_account)
+      throw authError(
+        "This action is only available to test accounts.",
+        403,
+        "TEST_ACCOUNT_REQUIRED",
+      );
+    await this.users.resetAllTestInteractions(userId);
+    return { reset: true };
   }
 
   session(user) {

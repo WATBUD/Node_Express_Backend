@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { parseBuffer } from 'music-metadata'
 
 const fail = (code, statusCode, message = code) => Object.assign(new Error(message), { code, statusCode })
-const MIN_DURATION_MS = 10_000
+const MIN_DURATION_MS = 6_000
 const MAX_DURATION_MS = 60_000
 const ALLOWED_TYPES = new Set([
   'audio/mp4',
@@ -69,10 +69,10 @@ export default class VoiceService {
     })
   }
 
-  async profileAudio(userId) {
+  async profileAudio(userId, viewerUserId) {
     const targetId = Number(userId)
     if (!Number.isInteger(targetId) || targetId <= 0) throw fail('INVALID_USER_ID', 400)
-    const item = await this.repository.getProfileVoice(targetId)
+    const item = await this.repository.getProfileVoice(targetId, viewerUserId)
     if (!item) throw fail('VOICE_PROFILE_NOT_FOUND', 404)
     return item
   }
@@ -82,7 +82,7 @@ export default class VoiceService {
     if (!Number.isInteger(recipientId) || recipientId <= 0 || recipientId === Number(senderUserId)) {
       throw fail('INVALID_VOICE_RECIPIENT', 400)
     }
-    if (!(await this.repository.findUser(recipientId))) throw fail('VOICE_RECIPIENT_NOT_FOUND', 404)
+    if (!(await this.repository.findUser(recipientId, senderUserId))) throw fail('VOICE_RECIPIENT_NOT_FOUND', 404)
     const durationMs = await inspectAudio(file)
     const result = await this.repository.create({
       senderUserId, recipientUserId: recipientId, durationMs, mimeType: file.mimetype,

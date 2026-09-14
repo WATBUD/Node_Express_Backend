@@ -247,11 +247,111 @@ class UserRepository {
     return await this.prisma.users.findMany();
   }
 
+  async discoverTextProfiles(viewerUserId) {
+    return this.prisma.$queryRaw`
+      SELECT u.user_id, p.display_name, p.birthdate, p.gender,
+             COALESCE(p.avatar_id, '') AS avatar_id,
+             COALESCE(p.location, '') AS location,
+             COALESCE(p.city, p.location, '') AS city,
+             COALESCE(p.headline, '') AS headline, p.bio,
+             u.last_active_at, p.updated_at,
+             CASE
+               WHEN p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+                 AND viewer.latitude IS NOT NULL AND viewer.longitude IS NOT NULL
+               THEN ROUND(6371 * ACOS(LEAST(1,
+                 COS(RADIANS(viewer.latitude)) * COS(RADIANS(p.latitude))
+                 * COS(RADIANS(p.longitude) - RADIANS(viewer.longitude))
+                 + SIN(RADIANS(viewer.latitude)) * SIN(RADIANS(p.latitude))
+               )), 1)
+               WHEN COALESCE(p.city, p.location) = COALESCE(viewer.city, viewer.location) THEN 0
+               ELSE NULL
+             END AS distance_km
+      FROM users u
+      JOIN user_profiles p ON p.user_id = u.user_id
+      JOIN user_profiles viewer ON viewer.user_id = ${Number(viewerUserId)}
+      WHERE u.user_id <> ${Number(viewerUserId)}
+        AND u.is_banned = FALSE
+        AND p.profile_initialized = TRUE
+        AND NULLIF(TRIM(p.bio), '') IS NOT NULL
+        AND (u.is_test_account = FALSE OR EXISTS (
+          SELECT 1 FROM users viewer_user
+          WHERE viewer_user.user_id = ${Number(viewerUserId)}
+            AND viewer_user.is_test_account = TRUE
+        ))
+      ORDER BY p.updated_at DESC, u.user_id DESC
+      LIMIT 100`;
+  }
+
   async deleteUser(userId) {
     if (this.isIni)
       return this.prisma
         .$executeRaw`DELETE FROM users WHERE user_id = ${Number(userId)}`;
     return this.prisma.users.delete({ where: { user_id: Number(userId) } });
+  }
+
+  async resetAllTestInteractions(recipientUserId) {
+    if (!this.isIni)
+      throw new Error("Test-data reset is only available for INI Dating.");
+    return this.prisma.$transaction(async (tx) => {
+      const reusableAudio = (await tx.$queryRaw`
+        SELECT mime_type, byte_size, duration_ms, sha256, audio_data
+        FROM voice_profile_assets
+        ORDER BY updated_at DESC
+        LIMIT 1`)[0];
+      await tx.$executeRaw`
+        DELETE FROM safety_reports
+        WHERE reporter_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)
+           OR reported_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)`;
+      // chat_messages 會隨 connections 的 ON DELETE CASCADE 一併清除。
+      await tx.$executeRaw`
+        DELETE FROM connections
+        WHERE user_low_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)
+           OR user_high_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)`;
+      // voice_recording_assets 會隨 voice_invites 的 ON DELETE CASCADE 一併清除。
+      await tx.$executeRaw`
+        DELETE FROM voice_invites
+        WHERE sender_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)
+           OR recipient_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)`;
+
+      // 重置後立刻恢復三筆基準測試資料，否則測試收件匣會變成空白。
+      if (reusableAudio) {
+        const fixtures = await tx.$queryRaw`
+          SELECT user_id
+          FROM users
+          WHERE user_account IN (
+            'ini.voice.fixture.1@test.invalid',
+            'ini.voice.fixture.2@test.invalid',
+            'ini.voice.fixture.3@test.invalid'
+          )
+          ORDER BY user_id`;
+        for (const fixture of fixtures) {
+          const senderId = Number(fixture.user_id);
+          await tx.$executeRaw`
+            INSERT INTO voice_profile_assets
+              (user_id, mime_type, byte_size, duration_ms, sha256, audio_data)
+            VALUES
+              (${senderId}, ${reusableAudio.mime_type}, ${Number(reusableAudio.byte_size)},
+               ${Number(reusableAudio.duration_ms)}, ${reusableAudio.sha256}, ${reusableAudio.audio_data})
+            ON DUPLICATE KEY UPDATE mime_type = VALUES(mime_type),
+              byte_size = VALUES(byte_size), duration_ms = VALUES(duration_ms),
+              sha256 = VALUES(sha256), audio_data = VALUES(audio_data),
+              updated_at = CURRENT_TIMESTAMP`;
+          await tx.$executeRaw`
+            INSERT INTO voice_invites
+              (sender_user_id, recipient_user_id, status, duration_ms)
+            VALUES
+              (${senderId}, ${Number(recipientUserId)}, 'pending', ${Number(reusableAudio.duration_ms)})`;
+          const inviteIds = await tx.$queryRaw`SELECT LAST_INSERT_ID() AS id`;
+          await tx.$executeRaw`
+            INSERT INTO voice_recording_assets
+              (voice_invite_id, mime_type, byte_size, sha256, audio_data)
+            VALUES
+              (${Number(inviteIds[0].id)}, ${reusableAudio.mime_type},
+               ${Number(reusableAudio.byte_size)}, ${reusableAudio.sha256}, ${reusableAudio.audio_data})`;
+        }
+      }
+      return true;
+    });
   }
 }
 const UserRepositoryInstance = new UserRepository(

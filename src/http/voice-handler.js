@@ -8,7 +8,7 @@ export default service => ({
   saveProfileVoice: async (req, res) => { try { res.json({ success: true, data: await service.saveProfileVoice(req.user.user_id, req.file) }) } catch (e) { sendError(res, e) } },
   profileAudio: async (req, res) => {
     try {
-      const item = await service.profileAudio(req.params.userId)
+      const item = await service.profileAudio(req.params.userId, req.user.user_id)
       res.set({ 'Content-Type': item.mime_type, 'Content-Length': String(item.byte_size), 'Cache-Control': 'private, max-age=300' })
       res.send(item.audio_data)
     } catch (e) { sendError(res, e) }

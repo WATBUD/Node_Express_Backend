@@ -4,6 +4,7 @@ import AuthService from "../src/services/auth-service.js";
 class MemoryUsers {
   constructor() {
     this.users = [];
+    this.testInteractionsReset = false;
   }
   async findUserByLogin(account) {
     const value = account.toLowerCase();
@@ -77,6 +78,10 @@ class MemoryUsers {
     if (index < 0) return 0;
     this.users.splice(index, 1);
     return 1;
+  }
+  async resetAllTestInteractions(recipientUserId) {
+    this.testInteractionsReset = true;
+    this.resetRecipientUserId = recipientUserId;
   }
 }
 
@@ -304,5 +309,27 @@ describe("AuthService", () => {
       }),
     ).to.deep.equal({ deleted: true });
     expect(await users.getUserById(registered.user.id)).to.equal(null);
+  });
+  it("allows only test accounts to reset all test interactions", async () => {
+    const users = new MemoryUsers();
+    users.users.push(
+      { user_id: 1, user_account: "tester@example.com", is_test_account: true },
+      { user_id: 2, user_account: "member@example.com", is_test_account: false },
+    );
+    const service = new AuthService(users);
+
+    expect(await service.resetTestData(1)).to.deep.equal({ reset: true });
+    expect(users.testInteractionsReset).to.equal(true);
+    expect(users.resetRecipientUserId).to.equal(1);
+
+    users.testInteractionsReset = false;
+    try {
+      await service.resetTestData(2);
+      throw new Error("expected rejection");
+    } catch (error) {
+      expect(error.code).to.equal("TEST_ACCOUNT_REQUIRED");
+      expect(error.statusCode).to.equal(403);
+    }
+    expect(users.testInteractionsReset).to.equal(false);
   });
 });

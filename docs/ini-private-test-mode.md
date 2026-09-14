@@ -1,29 +1,13 @@
 # INI Dating 測試模式
 
-INI Dating 以環境變數區分私人測試資料與正式服務資料。正式環境不能只靠前端隱藏內容；後端也會拒絕測試帳號登入，並從探索、收件匣、公開個人檔案及聊天室查詢中排除測試帳號。
+INI Dating 以登入帳號區分測試資料與正式資料，不再使用 App 或伺服器的全域測試模式。判斷來源固定為 `ini_dating.users.is_test_account`。
 
-## 模式設定
+## 帳號規則
 
-前端：
-
-```env
-EXPO_PUBLIC_APP_MODE=private-test
-```
-
-後端：
-
-```env
-INI_APP_MODE=private-test
-```
-
-私人測試時，前後端必須同時設為 `private-test`。正式部署則必須同時明確設為 `production`：
-
-```env
-EXPO_PUBLIC_APP_MODE=production
-INI_APP_MODE=production
-```
-
-未設定時，前端與後端一律預設為 `production`。私人測試必須明確設定兩個環境變數，避免開發設定意外出現在正式版本。正式建置仍建議明確設定，以便直接辨識部署用途。
+- `is_test_account=TRUE`：可以登入正式或開發版 App，並可看見測試帳號及測試內容。
+- `is_test_account=FALSE`：只能看見正式帳號及正式內容。
+- API 在探索、語音、收件匣、公開個人檔案及聊天室的查詢層執行隔離，不能靠修改前端繞過。
+- 登入 API 會回傳 `is_test_account`，前端據此決定是否載入內建展示內容。
 
 ## 測試帳號標記
 
@@ -39,9 +23,12 @@ UPDATE users SET is_test_account = TRUE WHERE user_id = 你的測試帳號ID;
 npm run migrate:ini:test-accounts
 ```
 
+## 目前私人測試帳號
+
+`z23320785@gmail.com` 已標記為測試帳號。
+
 ## 發布檢查
 
-- 前端建置環境為 `EXPO_PUBLIC_APP_MODE=production`
-- Render 後端為 `INI_APP_MODE=production`
 - 所有示範或自動化測試帳號均標記 `is_test_account=TRUE`
-- 使用正式版測試：測試帳號不能登入，探索與收件匣不出現測試資料
+- 一般帳號登入後，探索、收件匣及聊天室不可出現測試資料
+- 測試帳號登入後，可以正常讀取與操作測試資料
