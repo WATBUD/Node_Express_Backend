@@ -30,7 +30,11 @@ export default {
     return rows[0] ?? null
   },
 
-  async messages(connectionId, limit = 100) {
+  async messages(connectionId, limit = 100, afterId) {
+    if (afterId !== undefined) return db.$queryRaw`
+      SELECT id, sender_user_id, body, created_at FROM chat_messages
+      WHERE connection_id = ${numberId(connectionId)} AND deleted_at IS NULL AND id > ${afterId}
+      ORDER BY id ASC LIMIT ${limit}`
     return db.$queryRaw`
       SELECT * FROM (
         SELECT id, sender_user_id, body, created_at FROM chat_messages

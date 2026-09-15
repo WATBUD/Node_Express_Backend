@@ -2,6 +2,16 @@ import { expect } from 'chai'
 import ChatService from '../src/services/chat-service.js'
 
 describe('ChatService', () => {
+  it('validates and forwards incremental cursors without bypassing authorization', async () => {
+    const calls=[]
+    const service=new ChatService({connection:async()=>({id:9}),messages:async(...args)=>{calls.push(args);return []}})
+    await service.messages(1,2,'42')
+    expect(calls).to.deep.equal([[9,100,42]])
+    for(const cursor of ['-1','1x','1.5','9007199254740992']) {
+      try {await service.messages(1,2,cursor);throw new Error('expected rejection')}
+      catch(error){expect(error.code).to.equal('INVALID_CHAT_CURSOR')}
+    }
+  })
   it('requires an approved connection before reading or sending messages', async () => {
     const service = new ChatService({ connection: async () => null })
     for (const action of [() => service.messages(1, 2), () => service.send(1, 2, 'hello')]) {

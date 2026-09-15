@@ -18,10 +18,15 @@ export default class ChatService {
     }))
   }
 
-  async messages(userId, peerUserId) {
+  async messages(userId, peerUserId, afterId) {
+    let cursor
+    if (afterId !== undefined) {
+      cursor = Number(afterId)
+      if (!/^\d+$/.test(String(afterId)) || !Number.isSafeInteger(cursor) || cursor < 0) throw fail('INVALID_CHAT_CURSOR', 400)
+    }
     const connection = await this.repository.connection(userId, peerUserId)
     if (!connection) throw fail('CHAT_CONNECTION_REQUIRED', 403)
-    return (await this.repository.messages(connection.id)).map(row => publicMessage(row, userId))
+    return (await this.repository.messages(connection.id, 100, cursor)).map(row => publicMessage(row, userId))
   }
 
   async send(userId, peerUserId, input) {
