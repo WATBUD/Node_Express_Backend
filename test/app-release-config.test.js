@@ -15,7 +15,7 @@ describe('Android release config', () => {
   it('uses safe defaults when environment values are absent', () => {
     delete process.env.INI_ANDROID_MIN_VERSION_CODE
     delete process.env.INI_ANDROID_LATEST_VERSION_CODE
-    expect(androidReleaseConfig().minimumVersionCode).to.equal(1)
+    expect(androidReleaseConfig().minimumVersionCode).to.equal(11)
   })
 
   it('never reports latest below the minimum allowed build', () => {

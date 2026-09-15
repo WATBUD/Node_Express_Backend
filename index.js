@@ -90,6 +90,7 @@ app.use(
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/verification/request',
+  '/api/app-config/android',
   '/fake-api',
   '/',
   '/privacy-policy',

@@ -6,7 +6,7 @@ const positiveInteger = (value, fallback) => {
 export const androidReleaseConfig = () => {
   const minimumVersionCode = positiveInteger(
     process.env.INI_ANDROID_MIN_VERSION_CODE,
-    1,
+    11,
   )
   const latestVersionCode = Math.max(
     minimumVersionCode,
