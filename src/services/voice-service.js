@@ -56,6 +56,7 @@ export default class VoiceService {
       lastActiveAt: row.last_active_at,
       headline: row.headline || '', bio: row.bio || '',
       voiceDurationMs: Number(row.voice_duration_ms),
+      isConnected: Boolean(row.is_connected),
       voiceAudioPath: `/api/voice/profiles/${Number(row.id)}/audio`,
     }))
   }
