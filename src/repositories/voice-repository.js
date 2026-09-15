@@ -29,12 +29,7 @@ export default {
                WHEN COALESCE(p.city, p.location) = COALESCE(viewer.city, viewer.location) THEN 0
                ELSE NULL
              END AS distance_km,
-             vp.duration_ms AS voice_duration_ms,
-             EXISTS (
-               SELECT 1 FROM connections c
-               WHERE c.user_low_id = LEAST(${numberId(userId)}, u.user_id)
-                 AND c.user_high_id = GREATEST(${numberId(userId)}, u.user_id)
-             ) AS is_connected
+             vp.duration_ms AS voice_duration_ms
       FROM users u
       JOIN user_profiles p ON p.user_id = u.user_id
       JOIN voice_profile_assets vp ON vp.user_id = u.user_id
@@ -47,6 +42,11 @@ export default {
           WHERE v.sender_user_id = ${numberId(userId)}
             AND v.recipient_user_id = u.user_id
             AND v.status = 'pending'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM connections c
+          WHERE c.user_low_id = LEAST(${numberId(userId)}, u.user_id)
+            AND c.user_high_id = GREATEST(${numberId(userId)}, u.user_id)
         )
       ORDER BY p.updated_at DESC, u.user_id DESC
       LIMIT 100`
