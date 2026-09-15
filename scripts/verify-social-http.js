@@ -59,6 +59,7 @@ try {
   const voice=await call('/api/voice/invites',c.token,'POST',form(d.id),201)
   assert((await call('/api/voice/invites?box=inbox',d.token)).some(i=>i.id===voice.id))
   await call(`/api/voice/invites/${voice.id}/review`,d.token,'POST',{decision:'approved'})
+  await call('/api/voice/invites',c.token,'POST',form(d.id),409)
   const voiceChat=await call(`/api/chat/users/${c.id}/messages`,d.token,'POST',{text:'語音審核後的聊天驗證'},201)
   assert((await call(`/api/chat/users/${d.id}/messages`,c.token)).some(m=>m.id===voiceChat.id&&!m.mine))
   await call('/api/safety/reports',d.token,'POST',{reportedUserId:c.id,reasonCode:'harassment',note:'整合驗證檢舉'},201)
