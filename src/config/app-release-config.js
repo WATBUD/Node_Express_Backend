@@ -6,7 +6,7 @@ const positiveInteger = (value, fallback) => {
 export const androidReleaseConfig = () => {
   const minimumVersionCode = positiveInteger(
     process.env.INI_ANDROID_MIN_VERSION_CODE,
-    14, // Play release 14 approved; never advance this during review.
+    15, // Play release 15 approved; never advance this during review.
   )
   const latestVersionCode = Math.max(
     minimumVersionCode,

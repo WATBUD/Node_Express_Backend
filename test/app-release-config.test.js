@@ -16,8 +16,8 @@ describe('Android release config', () => {
     delete process.env.INI_ANDROID_MIN_VERSION_CODE
     delete process.env.INI_ANDROID_LATEST_VERSION_CODE
     const config = androidReleaseConfig()
-    expect(config.minimumVersionCode).to.equal(14)
-    expect(config.latestVersionCode).to.equal(14)
+    expect(config.minimumVersionCode).to.equal(15)
+    expect(config.latestVersionCode).to.equal(15)
     expect(config.latestVersionName).to.equal('1.0.4')
   })
 
