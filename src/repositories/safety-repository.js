@@ -9,8 +9,10 @@ export default {
     return rows.length > 0
   },
   async createReport(reporterUserId, reportedUserId, reasonCode, note) {
-    await db.$executeRaw`INSERT INTO safety_reports (reporter_user_id, reported_user_id, reason_code, note) VALUES (${reporterUserId}, ${reportedUserId}, ${reasonCode}, ${note || null})`
-    const ids = await db.$queryRaw`SELECT LAST_INSERT_ID() AS id`
-    return { id: Number(ids[0].id), status: 'pending', createdAt: new Date().toISOString() }
+    return db.$transaction(async tx => {
+      await tx.$executeRaw`INSERT INTO safety_reports (reporter_user_id, reported_user_id, reason_code, note) VALUES (${reporterUserId}, ${reportedUserId}, ${reasonCode}, ${note || null})`
+      const ids = await tx.$queryRaw`SELECT LAST_INSERT_ID() AS id`
+      return { id: Number(ids[0].id), status: 'pending', createdAt: new Date().toISOString() }
+    })
   },
 }

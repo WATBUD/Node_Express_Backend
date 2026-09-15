@@ -138,6 +138,14 @@ export default {
 
   async review(inviteId, recipientUserId, status) {
     return db.$transaction(async tx => {
+      const allowed = await tx.$queryRaw`
+        SELECT v.id FROM voice_invites v
+        JOIN users sender ON sender.user_id = v.sender_user_id
+        JOIN users recipient ON recipient.user_id = v.recipient_user_id
+        WHERE v.id = ${numberId(inviteId)} AND v.recipient_user_id = ${numberId(recipientUserId)}
+          AND v.status = 'pending' AND sender.is_test_account = recipient.is_test_account
+          AND sender.is_banned = FALSE AND recipient.is_banned = FALSE FOR UPDATE`
+      if (!allowed.length) return 0
       if (status === 'rejected') {
         return tx.$executeRaw`
           DELETE FROM voice_invites

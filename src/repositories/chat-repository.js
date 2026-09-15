@@ -30,16 +30,18 @@ export default {
 
   async messages(connectionId, limit = 100) {
     return db.$queryRaw`
-      SELECT id, sender_user_id, body, created_at
-      FROM chat_messages
-      WHERE connection_id = ${numberId(connectionId)} AND deleted_at IS NULL
-      ORDER BY created_at ASC, id ASC
-      LIMIT ${limit}`
+      SELECT * FROM (
+        SELECT id, sender_user_id, body, created_at FROM chat_messages
+        WHERE connection_id = ${numberId(connectionId)} AND deleted_at IS NULL
+        ORDER BY created_at DESC, id DESC LIMIT ${limit}
+      ) latest ORDER BY created_at ASC, id ASC`
   },
 
   async send(connectionId, senderUserId, body) {
-    await db.$executeRaw`INSERT INTO chat_messages (connection_id, sender_user_id, body) VALUES (${numberId(connectionId)}, ${numberId(senderUserId)}, ${body})`
-    const ids = await db.$queryRaw`SELECT LAST_INSERT_ID() AS id`
-    return { id: numberId(ids[0].id), sender_user_id: numberId(senderUserId), body, created_at: new Date() }
+    return db.$transaction(async tx => {
+      await tx.$executeRaw`INSERT INTO chat_messages (connection_id, sender_user_id, body) VALUES (${numberId(connectionId)}, ${numberId(senderUserId)}, ${body})`
+      const ids = await tx.$queryRaw`SELECT LAST_INSERT_ID() AS id`
+      return { id: numberId(ids[0].id), sender_user_id: numberId(senderUserId), body, created_at: new Date() }
+    })
   },
 }

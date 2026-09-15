@@ -308,6 +308,10 @@ class UserRepository {
            OR user_high_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)`;
       // voice_recording_assets 會隨 voice_invites 的 ON DELETE CASCADE 一併清除。
       await tx.$executeRaw`
+        DELETE FROM text_invites
+        WHERE sender_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)
+           OR recipient_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)`;
+      await tx.$executeRaw`
         DELETE FROM voice_invites
         WHERE sender_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)
            OR recipient_user_id IN (SELECT user_id FROM users WHERE is_test_account = TRUE)`;

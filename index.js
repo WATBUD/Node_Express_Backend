@@ -101,7 +101,7 @@ app.use(
 );
 
 // Routes
-app.use(['/api/auth', '/api/profiles', '/api/voice', '/api/chat', '/api/safety'], trackIniActivity);
+app.use(['/api/auth', '/api/profiles', '/api/text', '/api/voice', '/api/chat', '/api/safety'], trackIniActivity);
 import stockRoutes from './src/http/stock-routes.js';
 //import stockHandler from './src/http/stock-handler.js';
 //import stockRepository from './src/repositories/stock-repository.js';
@@ -144,6 +144,10 @@ import chatRepository from './src/repositories/chat-repository.js';
 
 const chatService = new ChatService(chatRepository);
 app.use('/api/chat', chatRoutes(chatHandler(chatService)));
+import textRoutes from './src/http/text-routes.js';
+import TextService from './src/services/text-service.js';
+import textRepository from './src/repositories/text-repository.js';
+app.use('/api/text', textRoutes(new TextService(textRepository)));
 /*------------------ */;
 import safetyRoutes from './src/http/safety-routes.js';
 import safetyHandler from './src/http/safety-handler.js';
