@@ -305,9 +305,10 @@ class UserRepository {
       await tx.$executeRaw`DELETE FROM user_blocks WHERE blocker_user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE) OR blocked_user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE)`;
       await tx.$executeRaw`DELETE FROM text_resonances WHERE user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE) OR profile_user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE)`;
       const reusableAudio = (await tx.$queryRaw`
-        SELECT mime_type, byte_size, duration_ms, sha256, audio_data
-        FROM voice_profile_assets
-        ORDER BY updated_at DESC
+        SELECT a.mime_type, a.byte_size, a.duration_ms, a.sha256, a.audio_data
+        FROM voice_profile_assets a JOIN users u ON u.user_id=a.user_id
+        WHERE u.is_test_account=TRUE AND u.is_banned=FALSE
+        ORDER BY a.updated_at DESC
         LIMIT 1`)[0];
       await tx.$executeRaw`
         DELETE FROM safety_reports
@@ -338,6 +339,7 @@ class UserRepository {
             'ini.voice.fixture.2@test.invalid',
             'ini.voice.fixture.3@test.invalid'
           )
+            AND is_test_account=TRUE AND user_id<>${Number(recipientUserId)}
           ORDER BY user_id`;
         for (const fixture of fixtures) {
           const senderId = Number(fixture.user_id);

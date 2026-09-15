@@ -2,6 +2,7 @@ const publicMessages = {
   ACCOUNT_EXISTS: 'This account is already registered.',
   ACCOUNT_MISMATCH: 'The account does not match the verified contact.',
   INVALID_VERIFICATION_CODE: 'The verification code is invalid or expired.',
+  INVALID_RESET_INPUT: 'Check the email, 6-digit code and new password of 8 to 128 characters.',
   INVALID_CREDENTIALS: 'The account or password is incorrect.',
   ACCOUNT_DISABLED: 'This account is disabled.',
   USER_NOT_FOUND: 'User not found.',
