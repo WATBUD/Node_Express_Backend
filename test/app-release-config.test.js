@@ -12,10 +12,13 @@ describe('Android release config', () => {
     else process.env.INI_ANDROID_LATEST_VERSION_CODE = originalLatest
   })
 
-  it('uses safe defaults when environment values are absent', () => {
+  it('requires the approved Play release when environment values are absent', () => {
     delete process.env.INI_ANDROID_MIN_VERSION_CODE
     delete process.env.INI_ANDROID_LATEST_VERSION_CODE
-    expect(androidReleaseConfig().minimumVersionCode).to.equal(1)
+    const config = androidReleaseConfig()
+    expect(config.minimumVersionCode).to.equal(14)
+    expect(config.latestVersionCode).to.equal(14)
+    expect(config.latestVersionName).to.equal('1.0.4')
   })
 
   it('never reports latest below the minimum allowed build', () => {
