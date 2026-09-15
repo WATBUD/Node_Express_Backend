@@ -9,6 +9,7 @@ import swaggerSpecs from './swagger-specs.js';
 import requestLogger from './src/middlewares/request-logger.js';
 import { globalLimiter } from './src/middlewares/security.js';
 import { trackIniActivity } from './src/middlewares/ini-activity.js';
+import { iniSessionGuard } from './src/middlewares/ini-session.js';
 import HttpClientService from "./src/services/http-client-service.js";
 import { androidReleaseConfig } from './src/config/app-release-config.js';
 dotenv.config();
@@ -90,6 +91,8 @@ app.use(
   '/api/auth/login',
   '/api/auth/register',
   '/api/auth/verification/request',
+  '/api/auth/password-reset/request',
+  '/api/auth/password-reset/confirm',
   '/api/app-config/android',
   '/fake-api',
   '/',
@@ -101,6 +104,7 @@ app.use(
 );
 
 // Routes
+app.use(['/api/auth','/api/profiles','/api/text','/api/voice','/api/chat','/api/safety'],iniSessionGuard(iniUserRepository));
 app.use(['/api/auth', '/api/profiles', '/api/text', '/api/voice', '/api/chat', '/api/safety'], trackIniActivity);
 import stockRoutes from './src/http/stock-routes.js';
 //import stockHandler from './src/http/stock-handler.js';

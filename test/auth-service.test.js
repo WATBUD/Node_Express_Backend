@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import AuthService from "../src/services/auth-service.js";
+import {requestVerification} from '../src/services/verification-service.js';
 
 class MemoryUsers {
   constructor() {
@@ -14,6 +15,8 @@ class MemoryUsers {
       ) || null
     );
   }
+  async canInteract() {return true;}
+  async resetPassword(id,passwordHash) {const user=await this.getUserById(id);user.password_hash=passwordHash;user.auth_token_version=(user.auth_token_version||0)+1;}
   async createUser(data) {
     const user = {
       ...data,
@@ -86,6 +89,19 @@ class MemoryUsers {
 }
 
 describe("AuthService", () => {
+  it('resets with a purpose-bound code, rejects reuse, and increments token version',async()=>{
+    const users=new MemoryUsers(),service=new AuthService(users);
+    const verification=await service.requestCode({channel:'email',destination:'reset.fixture@test.invalid'});
+    await service.register({channel:'email',account:'reset.fixture@test.invalid',email:'reset.fixture@test.invalid',phone:'',password:'OldPass123',verificationCode:verification.developmentCode,birthdate:'1996-05-20',gender:'female'});
+    const wrongPurpose=await requestVerification('email','reset.fixture@test.invalid');
+    try{await service.resetPassword({email:'reset.fixture@test.invalid',code:wrongPurpose.developmentCode,password:'NewPass123'});throw new Error('expected failure')}catch(e){expect(e.code).to.equal('INVALID_VERIFICATION_CODE')}
+    const reset=await service.requestPasswordReset({email:'reset.fixture@test.invalid'});
+    expect(await service.resetPassword({email:'reset.fixture@test.invalid',code:reset.developmentCode,password:'NewPass123'})).to.deep.equal({reset:true});
+    expect(users.users[0].auth_token_version).to.equal(1);
+    expect((await service.login({account:'reset.fixture@test.invalid',password:'NewPass123'})).accessToken).to.be.a('string');
+    try{await service.login({account:'reset.fixture@test.invalid',password:'OldPass123'});throw new Error('expected failure')}catch(e){expect(e.code).to.equal('INVALID_CREDENTIALS')}
+    try{await service.resetPassword({email:'reset.fixture@test.invalid',code:reset.developmentCode,password:'NewPass456'});throw new Error('expected failure')}catch(e){expect(e.code).to.equal('INVALID_VERIFICATION_CODE')}
+  });
   before(() => {
     process.env.JWT_SECRET = "test-secret-that-is-long-enough";
   });

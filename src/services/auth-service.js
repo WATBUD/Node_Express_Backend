@@ -261,6 +261,21 @@ export default class AuthService {
     if (user.is_banned) throw authError("帳號已停用", 403, "ACCOUNT_DISABLED");
     return this.session(user);
   }
+  async requestPasswordReset({email}={}) {
+    if(typeof email!=='string'||email.length>254||!/^\S+@\S+\.\S+$/.test(email.trim())) throw authError('Invalid email.',400,'INVALID_RESET_INPUT');
+    // Do not disclose whether an account exists. The delivered code is purpose-bound.
+    return requestVerification('email',email.trim().toLowerCase(),'password-reset');
+  }
+  async resetPassword({email,code,password}={}) {
+    if(typeof email!=='string'||email.length>254||!/^\S+@\S+\.\S+$/.test(email.trim())||typeof code!=='string'||!/^\d{6}$/.test(code)||typeof password!=='string'||password.length<8||password.length>128)
+      throw authError('Invalid password reset.',400,'INVALID_RESET_INPUT');
+    const destination=email.trim().toLowerCase();
+    if(!consumeVerification('email',destination,code,'password-reset')) throw authError('Invalid code.',400,'INVALID_VERIFICATION_CODE');
+    const user=await this.users.findUserByLogin(destination);
+    if(!user||user.is_banned) throw authError('Invalid code.',400,'INVALID_VERIFICATION_CODE');
+    await this.users.resetPassword(user.user_id,await hashPassword(password));
+    return {reset:true};
+  }
 
   async me(userId) {
     const user = await this.users.getUserById(userId);
@@ -280,6 +295,8 @@ export default class AuthService {
     if (!viewer || !user || user.is_banned || Boolean(user.is_test_account) !== Boolean(viewer.is_test_account))
       throw authError("User not found.", 404, "USER_NOT_FOUND");
     const options = await this.users.getCustomOptions(targetId);
+    if (!await this.users.canInteract(viewerUserId,targetId))
+      throw authError("User not found.",404,"USER_NOT_FOUND");
     const profile = publicUser({ ...user, ...options });
     return {
       id: profile.id,

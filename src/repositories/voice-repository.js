@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
+import { notBlocked } from './social-policy.js'
 import { iniDatabaseUrl } from '../database/database-urls.js'
 
 const db = new PrismaClient({ datasources: { db: { url: iniDatabaseUrl } } })
@@ -7,7 +8,7 @@ const numberId = value => Number(value)
 
 export default {
   async findUser(userId, viewerUserId = userId) {
-    const rows = await db.$queryRaw`SELECT user_id FROM users WHERE user_id = ${numberId(userId)} AND is_banned = FALSE AND is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)}) LIMIT 1`
+    const rows = await db.$queryRaw`SELECT user_id FROM users WHERE user_id = ${numberId(userId)} AND is_banned = FALSE AND is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)}) AND ${notBlocked(numberId(userId),numberId(viewerUserId))} LIMIT 1`
     return rows[0] ?? null
   },
 
@@ -34,6 +35,7 @@ export default {
       JOIN voice_profile_assets vp ON vp.user_id = u.user_id
       JOIN user_profiles viewer ON viewer.user_id = ${numberId(userId)}
       WHERE u.user_id <> ${numberId(userId)} AND u.is_banned = FALSE
+        AND ${notBlocked(numberId(userId),Prisma.raw('u.user_id'))}
         AND u.is_test_account = (SELECT viewer_user.is_test_account FROM users viewer_user WHERE viewer_user.user_id = ${numberId(userId)})
         AND NOT EXISTS (
           SELECT 1 FROM voice_invites v
@@ -66,6 +68,7 @@ export default {
       FROM voice_profile_assets vp
       JOIN users u ON u.user_id = vp.user_id
       WHERE vp.user_id = ${numberId(userId)} AND u.is_banned = FALSE
+        AND ${notBlocked(numberId(userId),numberId(viewerUserId))}
         AND u.is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)})
       LIMIT 1`
     return rows[0] ?? null
@@ -74,6 +77,8 @@ export default {
   async create({ senderUserId, recipientUserId, durationMs, mimeType, bytes, sha256 }) {
     try {
       return await db.$transaction(async tx => {
+      const allowed=await tx.$queryRaw`SELECT b.user_id FROM users a JOIN users b ON a.is_test_account=b.is_test_account WHERE a.user_id=${numberId(senderUserId)} AND b.user_id=${numberId(recipientUserId)} AND a.is_banned=FALSE AND b.is_banned=FALSE AND ${notBlocked(numberId(senderUserId),numberId(recipientUserId))} FOR UPDATE`
+      if(!allowed.length) throw Object.assign(new Error('USER_NOT_FOUND'),{code:'USER_NOT_FOUND',statusCode:404})
       const existing = await tx.$queryRaw`
         SELECT id FROM voice_invites
         WHERE sender_user_id = ${numberId(senderUserId)}
@@ -100,19 +105,21 @@ export default {
   async list(userId, box) {
     const ownerColumn = box === 'inbox' ? 'v.recipient_user_id' : 'v.sender_user_id'
     const peerColumn = box === 'inbox' ? 'v.sender_user_id' : 'v.recipient_user_id'
-    return db.$queryRawUnsafe(`
+    return db.$queryRaw`
       SELECT v.id, v.status, v.duration_ms, v.created_at, v.reviewed_at,
              u.user_id AS user_id, p.display_name AS name, p.avatar_id AS image,
              p.gender, p.location, p.headline, p.bio,
              a.mime_type, a.byte_size
       FROM voice_invites v
-      JOIN users u ON u.user_id = ${peerColumn}
+      JOIN users u ON u.user_id = ${Prisma.raw(peerColumn)}
       JOIN user_profiles p ON p.user_id = u.user_id
       JOIN voice_recording_assets a ON a.voice_invite_id = v.id
-      WHERE ${ownerColumn} = ? AND v.status <> 'cancelled'
-        AND u.is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ?)
+      WHERE ${Prisma.raw(ownerColumn)} = ${numberId(userId)} AND v.status <> 'cancelled'
+        AND u.is_banned=FALSE
+        AND ${notBlocked(numberId(userId),Prisma.raw('u.user_id'))}
+        AND u.is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(userId)})
       ORDER BY v.created_at DESC
-      LIMIT 100`, numberId(userId), numberId(userId))
+      LIMIT 100`
   },
 
   async getAccessible(inviteId, userId) {
@@ -124,6 +131,9 @@ export default {
       WHERE v.id = ${numberId(inviteId)}
         AND (v.sender_user_id = ${numberId(userId)} OR v.recipient_user_id = ${numberId(userId)})
         AND v.status <> 'cancelled'
+        AND ${notBlocked(Prisma.raw('v.sender_user_id'),Prisma.raw('v.recipient_user_id'))}
+        AND (SELECT is_banned FROM users WHERE user_id=v.sender_user_id)=FALSE
+        AND (SELECT is_banned FROM users WHERE user_id=v.recipient_user_id)=FALSE
         AND (SELECT is_test_account FROM users WHERE user_id = v.sender_user_id)
           = (SELECT is_test_account FROM users WHERE user_id = v.recipient_user_id)
       LIMIT 1`
@@ -144,7 +154,8 @@ export default {
         JOIN users recipient ON recipient.user_id = v.recipient_user_id
         WHERE v.id = ${numberId(inviteId)} AND v.recipient_user_id = ${numberId(recipientUserId)}
           AND v.status = 'pending' AND sender.is_test_account = recipient.is_test_account
-          AND sender.is_banned = FALSE AND recipient.is_banned = FALSE FOR UPDATE`
+          AND sender.is_banned = FALSE AND recipient.is_banned = FALSE
+          AND ${notBlocked(Prisma.raw('v.sender_user_id'),Prisma.raw('v.recipient_user_id'))} FOR UPDATE`
       if (!allowed.length) return 0
       if (status === 'rejected') {
         return tx.$executeRaw`

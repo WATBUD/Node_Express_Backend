@@ -17,6 +17,7 @@ export const generateToken = (user, expiresIn = '1h') => {
     return jwt.sign(
         {
             user_id: user.user_id,
+            auth_token_version: Number(user.auth_token_version || 0),
             username: user.username
         },
         secret,

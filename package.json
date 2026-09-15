@@ -23,6 +23,8 @@
     "migrate:ini:safety-reports": "node scripts/apply-safety-reports-migration.js",
     "migrate:ini:text": "node scripts/apply-text-migration.js",
     "verify:ini:social": "node scripts/verify-social-backend.js",
+    "verify:ini:social:http": "node scripts/verify-social-http.js",
+    "migrate:ini:social-safety": "node scripts/apply-social-safety-migration.js",
     "seed:ini:private-inboxes": "node scripts/seed-private-test-inboxes.js"
   },
   "prisma": {

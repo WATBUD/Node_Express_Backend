@@ -1,5 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { iniDatabaseUrl } from '../database/database-urls.js'
+import { notBlocked } from './social-policy.js'
 
 const db = new PrismaClient({ datasources: { db: { url: iniDatabaseUrl } } })
 const numberId = value => Number(value)
@@ -18,13 +19,14 @@ export default {
       JOIN user_profiles p ON p.user_id = u.user_id
       WHERE (c.user_low_id = ${numberId(userId)} OR c.user_high_id = ${numberId(userId)}) AND u.is_banned = FALSE
         AND u.is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(userId)})
+        AND ${notBlocked(numberId(userId), Prisma.raw('u.user_id'))}
       ORDER BY COALESCE(last_message_at, c.created_at) DESC`
   },
 
   async connection(userId, peerUserId) {
     const low = Math.min(numberId(userId), numberId(peerUserId))
     const high = Math.max(numberId(userId), numberId(peerUserId))
-    const rows = await db.$queryRaw`SELECT id FROM connections WHERE user_low_id = ${low} AND user_high_id = ${high} AND (SELECT is_test_account FROM users WHERE user_id = ${low}) = (SELECT is_test_account FROM users WHERE user_id = ${high}) LIMIT 1`
+    const rows = await db.$queryRaw`SELECT id FROM connections WHERE user_low_id = ${low} AND user_high_id = ${high} AND (SELECT is_test_account FROM users WHERE user_id = ${low}) = (SELECT is_test_account FROM users WHERE user_id = ${high}) AND (SELECT is_banned FROM users WHERE user_id=${low})=FALSE AND (SELECT is_banned FROM users WHERE user_id=${high})=FALSE AND ${notBlocked(low,high)} LIMIT 1`
     return rows[0] ?? null
   },
 

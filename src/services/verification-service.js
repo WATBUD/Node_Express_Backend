@@ -5,11 +5,11 @@ const CODE_TTL_MS = 10 * 60 * 1000
 const RESEND_MS = 60 * 1000
 const attempts = new Map()
 
-const keyOf = (channel, destination) => `${channel}:${destination.toLowerCase()}`
+const keyOf = (channel, destination, purpose) => `${purpose}:${channel}:${destination.toLowerCase()}`
 const digest = value => crypto.createHash('sha256').update(value).digest('hex')
 
-export const requestVerification = async (channel, destination) => {
-  const key = keyOf(channel, destination)
+export const requestVerification = async (channel, destination, purpose='registration') => {
+  const key = keyOf(channel, destination, purpose)
   const previous = attempts.get(key)
   if (previous && Date.now() - previous.sentAt < RESEND_MS) {
     const retryAfter = Math.ceil((RESEND_MS - (Date.now() - previous.sentAt)) / 1000)
@@ -44,8 +44,8 @@ export const requestVerification = async (channel, destination) => {
   return { developmentCode: code }
 }
 
-export const consumeVerification = (channel, destination, code) => {
-  const key = keyOf(channel, destination)
+export const consumeVerification = (channel, destination, code, purpose='registration') => {
+  const key = keyOf(channel, destination, purpose)
   const record = attempts.get(key)
   if (!record || record.expiresAt < Date.now()) {
     attempts.delete(key)

@@ -19,6 +19,8 @@ import {
 
 export default (handler) => {
   const router = express.Router();
+  if(handler.requestPasswordReset) router.post('/api/auth/password-reset/request',verificationIpLimiter,handler.requestPasswordReset);
+  if(handler.resetPassword) router.post('/api/auth/password-reset/confirm',loginLimiter,handler.resetPassword);
   /**
    * @swagger
    * /api/auth/verification/request:

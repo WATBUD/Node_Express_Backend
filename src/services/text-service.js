@@ -1,6 +1,14 @@
 const fail = (code, statusCode) => Object.assign(new Error(code), { code, statusCode })
 const validId = value => Number.isInteger(Number(value)) && Number(value) > 0
 export default class TextService {
+  resonances(viewer) {return this.repository.resonances(viewer)}
+  async resonate(viewer, peer, enabled) {
+    peer=Number(peer)
+    if (!Number.isInteger(peer)||peer<=0||peer===Number(viewer)||typeof enabled!=='boolean') throw Object.assign(new Error('INVALID_TEXT_RESONANCE'),{code:'INVALID_TEXT_RESONANCE',statusCode:400})
+    const result=await this.repository.resonate(viewer,peer,enabled)
+    if(result.error) throw Object.assign(new Error(result.error),{code:result.error,statusCode:404})
+    return result
+  }
   constructor(repository) { this.repository = repository }
   async send(userId, input) {
     const body = typeof input?.text === 'string' ? input.text.trim() : ''

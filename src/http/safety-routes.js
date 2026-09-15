@@ -12,6 +12,9 @@ const reportLimiter = rateLimit({
 
 export default handler => {
   const router = express.Router()
+  router.get('/state', handler.state)
+  router.put('/blocks/:userId', handler.block)
+  router.delete('/blocks/:userId', handler.unblock)
   router.post('/reports', reportLimiter, handler.createReport)
   return router
 }

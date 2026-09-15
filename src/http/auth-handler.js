@@ -11,6 +11,8 @@ const sendError = (_req, res, error) =>
     });
 
 export default (service) => ({
+  requestPasswordReset: async(req,res)=>{try{res.json({success:true,data:await service.requestPasswordReset(req.body)})}catch(e){sendError(req,res,e)}},
+  resetPassword: async(req,res)=>{try{res.json({success:true,data:await service.resetPassword(req.body)})}catch(e){sendError(req,res,e)}},
   requestVerification: async (req, res) => {
     try {
       res.json({ success: true, data: await service.requestCode(req.body) });

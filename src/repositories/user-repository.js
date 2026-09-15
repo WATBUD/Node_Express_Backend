@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
+import { notBlocked } from './social-policy.js';
 import {
   iniDatabaseUrl,
   watchlabDatabaseUrl,
@@ -272,6 +273,7 @@ class UserRepository {
       WHERE u.user_id <> ${Number(viewerUserId)}
         AND u.is_banned = FALSE
         AND p.profile_initialized = TRUE
+        AND ${notBlocked(Number(viewerUserId), Prisma.raw('u.user_id'))}
         AND NULLIF(TRIM(p.bio), '') IS NOT NULL
         AND u.is_test_account = (
           SELECT viewer_user.is_test_account FROM users viewer_user
@@ -279,6 +281,14 @@ class UserRepository {
         )
       ORDER BY p.updated_at DESC, u.user_id DESC
       LIMIT 100`;
+  }
+
+  async canInteract(viewer, peer) {
+    const rows = await this.prisma.$queryRaw`SELECT user_id FROM users WHERE user_id=${Number(peer)} AND ${notBlocked(Number(viewer),Number(peer))} LIMIT 1`;
+    return rows.length > 0;
+  }
+  async resetPassword(userId,passwordHash) {
+    await this.prisma.$executeRaw`UPDATE users SET password_hash=${passwordHash},auth_token_version=auth_token_version+1,updated_at=CURRENT_TIMESTAMP WHERE user_id=${Number(userId)} AND is_banned=FALSE`;
   }
 
   async deleteUser(userId) {
@@ -292,6 +302,8 @@ class UserRepository {
     if (!this.isIni)
       throw new Error("Test-data reset is only available for INI Dating.");
     return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`DELETE FROM user_blocks WHERE blocker_user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE) OR blocked_user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE)`;
+      await tx.$executeRaw`DELETE FROM text_resonances WHERE user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE) OR profile_user_id IN (SELECT user_id FROM users WHERE is_test_account=TRUE)`;
       const reusableAudio = (await tx.$queryRaw`
         SELECT mime_type, byte_size, duration_ms, sha256, audio_data
         FROM voice_profile_assets
