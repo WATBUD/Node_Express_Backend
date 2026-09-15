@@ -7,7 +7,7 @@ const numberId = value => Number(value)
 
 export default {
   async findUser(userId, viewerUserId = userId) {
-    const rows = await db.$queryRaw`SELECT user_id FROM users WHERE user_id = ${numberId(userId)} AND is_banned = FALSE AND (is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)} AND viewer.is_test_account = TRUE)) LIMIT 1`
+    const rows = await db.$queryRaw`SELECT user_id FROM users WHERE user_id = ${numberId(userId)} AND is_banned = FALSE AND is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)}) LIMIT 1`
     return rows[0] ?? null
   },
 
@@ -34,7 +34,7 @@ export default {
       JOIN voice_profile_assets vp ON vp.user_id = u.user_id
       JOIN user_profiles viewer ON viewer.user_id = ${numberId(userId)}
       WHERE u.user_id <> ${numberId(userId)} AND u.is_banned = FALSE
-        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer_user WHERE viewer_user.user_id = ${numberId(userId)} AND viewer_user.is_test_account = TRUE))
+        AND u.is_test_account = (SELECT viewer_user.is_test_account FROM users viewer_user WHERE viewer_user.user_id = ${numberId(userId)})
         AND NOT EXISTS (
           SELECT 1 FROM voice_invites v
           WHERE v.sender_user_id = ${numberId(userId)}
@@ -66,7 +66,7 @@ export default {
       FROM voice_profile_assets vp
       JOIN users u ON u.user_id = vp.user_id
       WHERE vp.user_id = ${numberId(userId)} AND u.is_banned = FALSE
-        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)} AND viewer.is_test_account = TRUE))
+        AND u.is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ${numberId(viewerUserId)})
       LIMIT 1`
     return rows[0] ?? null
   },
@@ -110,7 +110,7 @@ export default {
       JOIN user_profiles p ON p.user_id = u.user_id
       JOIN voice_recording_assets a ON a.voice_invite_id = v.id
       WHERE ${ownerColumn} = ? AND v.status <> 'cancelled'
-        AND (u.is_test_account = FALSE OR EXISTS (SELECT 1 FROM users viewer WHERE viewer.user_id = ? AND viewer.is_test_account = TRUE))
+        AND u.is_test_account = (SELECT viewer.is_test_account FROM users viewer WHERE viewer.user_id = ?)
       ORDER BY v.created_at DESC
       LIMIT 100`, numberId(userId), numberId(userId))
   },
@@ -124,6 +124,8 @@ export default {
       WHERE v.id = ${numberId(inviteId)}
         AND (v.sender_user_id = ${numberId(userId)} OR v.recipient_user_id = ${numberId(userId)})
         AND v.status <> 'cancelled'
+        AND (SELECT is_test_account FROM users WHERE user_id = v.sender_user_id)
+          = (SELECT is_test_account FROM users WHERE user_id = v.recipient_user_id)
       LIMIT 1`
     return rows[0] ?? null
   },

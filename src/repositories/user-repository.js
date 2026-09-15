@@ -273,11 +273,10 @@ class UserRepository {
         AND u.is_banned = FALSE
         AND p.profile_initialized = TRUE
         AND NULLIF(TRIM(p.bio), '') IS NOT NULL
-        AND (u.is_test_account = FALSE OR EXISTS (
-          SELECT 1 FROM users viewer_user
+        AND u.is_test_account = (
+          SELECT viewer_user.is_test_account FROM users viewer_user
           WHERE viewer_user.user_id = ${Number(viewerUserId)}
-            AND viewer_user.is_test_account = TRUE
-        ))
+        )
       ORDER BY p.updated_at DESC, u.user_id DESC
       LIMIT 100`;
   }

@@ -277,7 +277,7 @@ export default class AuthService {
       this.users.getUserById(viewerUserId),
       this.users.getUserById(targetId),
     ]);
-    if (!user || user.is_banned || (user.is_test_account && !viewer?.is_test_account))
+    if (!viewer || !user || user.is_banned || Boolean(user.is_test_account) !== Boolean(viewer.is_test_account))
       throw authError("User not found.", 404, "USER_NOT_FOUND");
     const options = await this.users.getCustomOptions(targetId);
     const profile = publicUser({ ...user, ...options });

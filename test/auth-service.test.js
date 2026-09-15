@@ -310,6 +310,23 @@ describe("AuthService", () => {
     ).to.deep.equal({ deleted: true });
     expect(await users.getUserById(registered.user.id)).to.equal(null);
   });
+  it("rejects cross-group profiles in both directions", async () => {
+    const users = new MemoryUsers();
+    users.users.push(
+      { user_id: 1, is_test_account: true },
+      { user_id: 2, is_test_account: false },
+    );
+    const service = new AuthService(users);
+    for (const [viewer, target] of [[1, 2], [2, 1]]) {
+      try {
+        await service.publicProfile(viewer, target);
+        throw new Error("expected rejection");
+      } catch (error) {
+        expect(error.code).to.equal("USER_NOT_FOUND");
+        expect(error.statusCode).to.equal(404);
+      }
+    }
+  });
   it("allows only test accounts to reset all test interactions", async () => {
     const users = new MemoryUsers();
     users.users.push(
