@@ -17,8 +17,8 @@ export default {
     return { blocked: false }
   },
   async state(viewer) {
-    const blocked = await db.$queryRaw`SELECT u.user_id,p.display_name,p.avatar_id,p.gender FROM user_blocks b JOIN users u ON u.user_id=b.blocked_user_id LEFT JOIN user_profiles p ON p.user_id=u.user_id WHERE b.blocker_user_id=${Number(viewer)} ORDER BY b.created_at DESC`
-    const reports = await db.$queryRaw`SELECT r.id,r.reported_user_id,r.reason_code,r.note,r.created_at,r.status,p.display_name FROM safety_reports r LEFT JOIN user_profiles p ON p.user_id=r.reported_user_id WHERE r.reporter_user_id=${Number(viewer)} ORDER BY r.created_at DESC,r.id DESC LIMIT 200`
+    const blocked = await db.$queryRaw`SELECT u.user_id,p.display_name,p.avatar_id,p.gender FROM user_blocks b JOIN users u ON u.user_id=b.blocked_user_id LEFT JOIN user_profiles p ON p.user_id=u.user_id WHERE b.blocker_user_id=${Number(viewer)} AND u.is_test_account=(SELECT is_test_account FROM users WHERE user_id=${Number(viewer)}) ORDER BY b.created_at DESC`
+    const reports = await db.$queryRaw`SELECT r.id,r.reported_user_id,r.reason_code,r.note,r.created_at,r.status,p.display_name FROM safety_reports r JOIN users u ON u.user_id=r.reported_user_id LEFT JOIN user_profiles p ON p.user_id=r.reported_user_id WHERE r.reporter_user_id=${Number(viewer)} AND u.is_test_account=(SELECT is_test_account FROM users WHERE user_id=${Number(viewer)}) ORDER BY r.created_at DESC,r.id DESC LIMIT 200`
     return {
       blockedUsers: blocked.map(u=>({id:String(u.user_id),name:u.display_name||'會員',image:u.avatar_id||'star-dragon',gender:u.gender||'male'})),
       reports: reports.map(r=>({id:String(r.id),userId:String(r.reported_user_id),name:r.display_name||'會員',reasonId:r.reason_code,note:r.note||'',at:r.created_at,status:r.status})),
