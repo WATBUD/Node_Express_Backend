@@ -21,7 +21,7 @@ export default handler => {
    * /api/voice/profile:
    *   put:
    *     tags: [Voice invitations]
-   *     summary: 新增或更換自己的 10 至 60 秒公開自介語音
+   *     summary: 新增或更換自己的 6 至 60 秒公開自介語音
    *     security: [{ bearerAuth: [] }]
    *     requestBody:
    *       required: true
@@ -74,7 +74,7 @@ export default handler => {
    *         description: 語音邀請清單
    *   post:
    *     tags: [Voice invitations]
-   *     summary: 送出 10 至 60 秒語音邀請
+   *     summary: 送出 6 至 60 秒語音邀請
    *     security: [{ bearerAuth: [] }]
    *     requestBody:
    *       required: true

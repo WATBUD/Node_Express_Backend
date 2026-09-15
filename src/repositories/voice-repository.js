@@ -79,6 +79,8 @@ export default {
       return await db.$transaction(async tx => {
       const allowed=await tx.$queryRaw`SELECT b.user_id FROM users a JOIN users b ON a.is_test_account=b.is_test_account WHERE a.user_id=${numberId(senderUserId)} AND b.user_id=${numberId(recipientUserId)} AND a.is_banned=FALSE AND b.is_banned=FALSE AND ${notBlocked(numberId(senderUserId),numberId(recipientUserId))} FOR UPDATE`
       if(!allowed.length) throw Object.assign(new Error('USER_NOT_FOUND'),{code:'USER_NOT_FOUND',statusCode:404})
+      const connected=await tx.$queryRaw`SELECT id FROM connections WHERE user_low_id=LEAST(${numberId(senderUserId)},${numberId(recipientUserId)}) AND user_high_id=GREATEST(${numberId(senderUserId)},${numberId(recipientUserId)}) LIMIT 1`
+      if(connected.length) throw Object.assign(new Error('CHAT_ALREADY_CONNECTED'),{code:'CHAT_ALREADY_CONNECTED',statusCode:409})
       const existing = await tx.$queryRaw`
         SELECT id FROM voice_invites
         WHERE sender_user_id = ${numberId(senderUserId)}

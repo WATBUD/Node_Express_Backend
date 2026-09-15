@@ -51,6 +51,7 @@ try {
   assert((await voice.list(d,'inbox')).some(x=>x.id===invitation.id))
   assert((await voice.audio(invitation.id,d)).audio_data.length===wav.length)
   await voice.review(invitation.id,d,'approved')
+  await assert.rejects(()=>voice.send(c,d,file),e=>e.code==='CHAT_ALREADY_CONNECTED')
   const voiceMessage=await chat.send(d,c,'語音邀請通過後的跨帳號訊息')
   assert((await chat.messages(c,d)).some(x=>x.id===voiceMessage.id&&!x.mine))
   console.log('PASS voice intro/send/inbox/audio/approve + chat cross-account persistence')
